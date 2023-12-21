@@ -1,0 +1,9 @@
+<changelist name="Uncommitted_changes_before_Checkout_at_2023_12_12_22_25_[Changes]1" date="1702391136724" recycled="true" deleted="true">
+  <option name="PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Checkout_at_2023_12_12_22_25_[Changes]1/shelved.patch" />
+  <option name="DESCRIPTION" value="Uncommitted changes before Checkout at 2023/12/12 22:25 [Changes]" />
+  <binary>
+    <option name="BEFORE_PATH" value="target/classes/cpu/fpu/FPU.class" />
+    <option name="AFTER_PATH" value="target/classes/cpu/fpu/FPU.class" />
+    <option name="SHELVED_PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Checkout_at_2023_12_12_22_25_[Changes]1/FPU.class" />
+  </binary>
+</changelist>

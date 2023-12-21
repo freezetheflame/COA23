@@ -1,0 +1,1037 @@
+Index: src/main/java/util/Transformer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package util;\r\n\r\npublic class Transformer {\r\n    /**\r\n     * Integer to BinaryString\r\n     *\r\n     * @param numStr to be converted\r\n     * @return result\r\n     */\r\n    public static String intToBinary(String numStr) {\r\n        int num = Integer.parseInt(numStr);\r\n        if (num == 0) return \"00000000000000000000000000000000\";  //0单独判读\r\n        if (num == 0x80000000) return \"10000000000000000000000000000000\";\r\n        boolean isNeg = false;\r\n        if (num < 0) {  //负数转正数\r\n            num = -num;\r\n            isNeg = true;\r\n        }\r\n        StringBuilder temp = new StringBuilder();\r\n        while (num > 0) {  //转为二进制\r\n            if (num % 2 == 1) temp.append(\"1\");\r\n            else temp.append(\"0\");\r\n            num /= 2;\r\n        }\r\n        String ans = temp.reverse().toString();  //反转\r\n        int len = ans.length();\r\n        for (int i = 0; i < 32 - len; i++) ans = \"0\" + ans;\r\n        if (isNeg) {  //如果是负数那么取反加一\r\n            ans = oneAdder(negation(ans)).substring(1);\r\n        }\r\n        return ans;\r\n    }\r\n\r\n    public static String binaryToInt(String binStr) {\r\n        return String.valueOf(valueOf(binStr, 2));\r\n    }\r\n\r\n    public static String floatToBinary(String floatStr) {\r\n        int eLength = 8;\r\n        int sLength = 23;\r\n\r\n        float d = Float.parseFloat(floatStr);\r\n        boolean isNeg = d < 0;\r\n\r\n        if (Float.isNaN(d)) {\r\n            return \"Nan\";\r\n        }\r\n        if (!isFinite(d, eLength, sLength)) {\r\n            return isNeg ? \"-Inf\" : \"+Inf\";  //NaN暂时不考虑\r\n        }\r\n\r\n        StringBuilder answer = new StringBuilder(1 + eLength + sLength);\r\n\r\n        if (isNeg) answer.append(\"1\");  //value is negative, so append sign info\r\n        else answer.append(\"0\");\r\n\r\n        if (d == 0.0) {\r\n            for (int i = 0; i < eLength + sLength; i++) {  //zero representation\r\n                answer.append(\"0\");\r\n            }\r\n            return answer.toString();\r\n        } else {\r\n            d = Math.abs(d);\r\n            int bias = (int) ((maxValue(eLength) + 1) / 2 - 1);  //bias\r\n            boolean subnormal = (d < minNormal(eLength, sLength));\r\n\r\n            if (subnormal) {\r\n                for (int i = 0; i < eLength; i++) {\r\n                    answer.append(\"0\");\r\n                }\r\n                d = (float) (d * Math.pow(2, bias - 1));  //将指数消去\r\n                // d = 0.xxxxx\r\n                answer.append(fixPoint(d, sLength));\r\n            } else {\r\n                // float exponent = Math.getExponent(d);  // 0.5 -> -1\r\n                int exponent = (int) getExponent(d);\r\n                answer.append(integerRepresentation(String.valueOf((int) (exponent + bias)), eLength));  //add the bias\r\n                d = (float) (d / Math.pow(2, exponent));\r\n                // d = 1.xxxxx\r\n                answer.append(fixPoint(d - 1, sLength));  //fixPoint传入的参数要求小于1，自动忽略了隐藏位\r\n            }\r\n        }\r\n        return answer.toString();\r\n    }\r\n\r\n    public static String binaryToFloat(String binStr) {\r\n        boolean isNeg = (binStr.charAt(0) == '1');\r\n        String exp = binStr.substring(1, 9);\r\n        String frag = binStr.substring(9);\r\n\r\n        if (exp.equals(\"11111111\")) {\r\n            if (frag.contains(\"1\")) {\r\n                return \"NaN\";\r\n            } else {\r\n                return isNeg ? \"-Inf\" : \"+Inf\";\r\n            }\r\n        } else if (exp.equals(\"00000000\")) {\r\n            if (frag.contains(\"1\")) {\r\n                float f = 0.0F;\r\n                int fe = 1;\r\n                for (char fc : frag.toCharArray()) {\r\n                    f += Integer.parseInt(String.valueOf(fc)) / Math.pow(2, fe);\r\n                    fe++;\r\n                }\r\n                f = (float) ((f) * Math.pow(2, -126));\r\n                f = isNeg ? -f : f;\r\n                return String.valueOf(f);\r\n            } else {\r\n                return \"0.0\";\r\n            }\r\n        }\r\n\r\n        float f = 0.0F;\r\n        int fe = 1;\r\n        for (char fc : frag.toCharArray()) {\r\n            f += Integer.parseInt(String.valueOf(fc)) / Math.pow(2, fe);\r\n            fe++;\r\n        }\r\n\r\n        int e = valueOf(exp, 2) - 127;\r\n        f = (float) ((1 + f) * Math.pow(2, e));\r\n        f = isNeg ? -f : f;\r\n\r\n        return String.valueOf(f);\r\n    }\r\n\r\n    public static String decimalToNBCD(String decimal) {\r\n        return getBCDString(Integer.parseInt(decimal));\r\n    }\r\n\r\n    public static String NBCDToDecimal(String NBCDStr) {\r\n        return String.valueOf(NBCDTrueValue(NBCDStr));\r\n    }\r\n\r\n    /**\r\n     * add one to the operand\r\n     *\r\n     * @param operand the operand\r\n     * @return result after adding, the first position means overflow (not equal to the carray to the next) and the remains means the result\r\n     */\r\n    private static String oneAdder(String operand) {\r\n        int len = operand.length();\r\n        StringBuffer temp = new StringBuffer(operand);\r\n        temp = temp.reverse();\r\n        int[] num = new int[len];\r\n        for (int i = 0; i < len; i++) num[i] = temp.charAt(i) - '0';  //先转化为反转后对应的int数组\r\n        int bit = 0x0;\r\n        int carry = 0x1;\r\n        char[] res = new char[len];\r\n        for (int i = 0; i < len; i++) {\r\n            bit = num[i] ^ carry;\r\n            carry = num[i] & carry;\r\n            res[i] = (char) ('0' + bit);  //显示转化为char\r\n        }\r\n        String result = new StringBuffer(new String(res)).reverse().toString();\r\n        return \"\" + (result.charAt(0) == operand.charAt(0) ? '0' : '1') + result;  //注意有进位不等于溢出，溢出要另外判断\r\n    }\r\n\r\n    /**\r\n     * convert the string's 0 and 1.\r\n     * e.g 00000 to 11111\r\n     *\r\n     * @param operand string to convert (by default, it is 32 bits long)\r\n     * @return string after converting\r\n     */\r\n    private static String negation(String operand) {\r\n        StringBuffer result = new StringBuffer();\r\n        for (int i = 0; i < operand.length(); i++) {\r\n            result = operand.charAt(i) == '1' ? result.append(\"0\") : result.append(\"1\");\r\n        }\r\n        return result.toString();\r\n    }\r\n\r\n    /**\r\n     * equal to the Integer.valueOf\r\n     *\r\n     * @param num   a string\r\n     * @param radix radix\r\n     * @return result\r\n     */\r\n    private static int valueOf(String num, int radix) {\r\n        int ans = 0;\r\n        for (int i = 0; i < num.length(); i++) {\r\n            int temp = 0;\r\n            if (num.charAt(i) <= '9' && num.charAt(i) >= '0') temp = num.charAt(i) - '0';\r\n            else temp = num.charAt(i) - 'a' + 10;\r\n            ans = ans * radix + temp;\r\n        }\r\n        return ans;\r\n    }\r\n\r\n    /**\r\n     * convert a string as a num's NBCD's representation to its true value\r\n     *\r\n     * @param operand to be converted\r\n     * @return the string format of its true value\r\n     */\r\n    private static int NBCDTrueValue(String operand) {\r\n        StringBuilder ans = new StringBuilder();\r\n        if (operand.startsWith(\"1101\")) ans.append('-');\r\n        operand = operand.substring(4);\r\n        for (int i = 0; i < operand.length() && i < 28; i += 4) {\r\n            ans.append(Integer.valueOf(operand.substring(i, i + 4), 2));\r\n        }\r\n        return Integer.parseInt(ans.toString());\r\n    }\r\n\r\n    /**\r\n     * 十进制数转BCD码\r\n     *\r\n     * @param val 十进制整数\r\n     * @return 1 +  4*(整数位数) BCD码\r\n     */\r\n    public static String getBCDString(int val) {\r\n//        if (val == 0) return \"1100 0000\";\r\n        String sign = val < 0 ? \"1101\" : \"1100\"; //得到符号位\r\n        String result = \"\";\r\n        val = Math.abs(val);\r\n        int i = 7;\r\n        while (i > 0) {\r\n            int tmpVal = val % 10;\r\n            result = getBCDString_4(tmpVal).concat(result);\r\n            val = val / 10;\r\n            i--;\r\n        }\r\n        return sign.concat(result);\r\n    }\r\n\r\n    /**\r\n     * @param val 0-9的整数\r\n     * @return 4位二进制数 [0000 - 1001]\r\n     */\r\n    private static String getBCDString_4(int val) {\r\n        String result = \"\";\r\n        for (int i = 0; i < 4; i++, val = val / 2) {\r\n            if (val % 2 == 1)\r\n                result = \"1\".concat(result);\r\n            else\r\n                result = \"0\".concat(result);\r\n        }\r\n        return result;\r\n    }\r\n\r\n    /**\r\n     * calculate the max value (true value) with the given length of bits\r\n     *\r\n     * @param length given length\r\n     * @return result\r\n     */\r\n    private static float maxValue(int length) {\r\n        //不能使用移位操作\r\n        return (float) (Math.pow(2, length) - 1);\r\n    }\r\n\r\n    /**\r\n     * check if the number could be present\r\n     *\r\n     * @param d       decimal\r\n     * @param eLength exponent's length\r\n     * @param sLength significand's length\r\n     * @return result\r\n     */\r\n    private static boolean isFinite(float d, int eLength, int sLength) {\r\n        int bias = (int) ((maxValue(eLength) + 1) / 2 - 1);  //bias\r\n        int exponent = (int) (maxValue(eLength) - 1 - bias - sLength);  //指数全1和全0是特殊情况，这里只要计算可以被正常表示的最大值，因此-1，且直接将significand转化的位数减去\r\n        float significand = maxValue(sLength + 1);  //加上隐藏位\r\n        float result = (float) (significand * Math.pow(2, exponent));\r\n        return d >= -result && d <= result;\r\n//\t\treturn result;  //用于测试最大值\r\n    }\r\n\r\n    /**\r\n     * calculate the min normal with the given length\r\n     *\r\n     * @param eLength exponent's length\r\n     * @param sLength significand's length\r\n     * @return result\r\n     */\r\n    private static float minNormal(int eLength, int sLength) {\r\n        int bias = (int) ((maxValue(eLength) + 1) / 2 - 1);  //bias\r\n        return (float) Math.pow(2, 1 - bias);  //指数为1，阶码全0\r\n    }\r\n\r\n    /**\r\n     * calculate the fix-point representation\r\n     *\r\n     * @param d       decimal num must be smaller than 1\r\n     * @param sLength length of the result\r\n     * @return fix-point string\r\n     */\r\n    private static String fixPoint(float d, int sLength) {\r\n        d = d < 1 ? d : d - (int) d;  //d = 0.xxxxx\r\n        StringBuilder res = new StringBuilder();\r\n        int count = 0;\r\n        while (d != 0 && count < sLength) {\r\n            d *= 2;\r\n            if (d < 1) {\r\n                res.append(\"0\");\r\n            } else {\r\n                d -= 1;\r\n                res.append(\"1\");\r\n            }\r\n            count++;  //最长为sLength的长度\r\n        }\r\n        int len = res.length();  //不能直接用res.length()\r\n        for (int i = 0; i < sLength - len; i++) res.append(0);\r\n        return res.toString();\r\n    }\r\n\r\n    /**\r\n     * make a num to format 1.xxxxx, return the exponent of 2\r\n     *\r\n     * @param d num\r\n     * @return exponent\r\n     */\r\n    private static float getExponent(float d) {\r\n        if (d == 0) return 0;  //0不能得到正确结果，即-bias\r\n        int exponent = 0;\r\n        while (d >= 2) {\r\n            d /= 2;\r\n            exponent++;\r\n        }\r\n        while (d < 1) {\r\n            d *= 2;\r\n            exponent--;\r\n        }\r\n        return exponent;\r\n    }\r\n\r\n    /**\r\n     * convert a number to its implement representation\r\n     *\r\n     * @param number a num to be converted\r\n     * @param length the return string's length\r\n     * @return its implement representation\r\n     */\r\n    private static String integerRepresentation(String number, int length) {\r\n        int num = Integer.valueOf(number);\r\n        // num = number.charAt(0) == '-' ? -Integer.valueOf(number.substring(1)) : Integer.valueOf(number);\r\n        if (num < 0) return Integer.toBinaryString(num).substring(32 - length);\r\n        else {\r\n            String result = Integer.toBinaryString(num);\r\n            int len = length - result.length();  //这一步要先提取出来，不然下面会实时计算len\r\n            for (int i = 0; i < len; i++) {\r\n                result = \"0\" + result;\r\n            }\r\n            return result;\r\n        }\r\n    }\r\n\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/util/Transformer.java b/src/main/java/util/Transformer.java
+--- a/src/main/java/util/Transformer.java	(revision deb45f0033173f305c79e16f5d7ed16e8843ef4b)
++++ b/src/main/java/util/Transformer.java	(date 1702558335502)
+@@ -31,6 +31,8 @@
+         return ans;
+     }
+ 
++
++
+     public static String binaryToInt(String binStr) {
+         return String.valueOf(valueOf(binStr, 2));
+     }
+Index: src/main/java/cpu/fpu/FPU.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package cpu.fpu;\r\n\r\nimport util.DataType;\r\nimport util.IEEE754Float;\r\nimport util.Transformer;\r\n\r\nimport java.util.Collections;\r\nimport java.util.Scanner;\r\n\r\n/**\r\n * floating point unit\r\n * 执行浮点运算的抽象单元\r\n * 浮点数精度：使用3位保护位进行计算\r\n */\r\npublic class FPU {\r\n\r\n    private final String[][] addCorner = new String[][]{\r\n            {IEEE754Float.P_ZERO, IEEE754Float.P_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.P_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.P_ZERO, IEEE754Float.N_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.N_ZERO, IEEE754Float.N_ZERO},\r\n            {IEEE754Float.P_INF, IEEE754Float.N_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.N_INF, IEEE754Float.P_INF, IEEE754Float.NaN}\r\n    };\r\n\r\n    private final String[][] subCorner = new String[][]{\r\n            {IEEE754Float.P_ZERO, IEEE754Float.P_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.P_ZERO, IEEE754Float.N_ZERO},\r\n            {IEEE754Float.P_ZERO, IEEE754Float.N_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.N_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.P_INF, IEEE754Float.P_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.N_INF, IEEE754Float.N_INF, IEEE754Float.NaN}\r\n    };\r\n\r\n    private final String[][] mulCorner = new String[][]{\r\n            {IEEE754Float.P_ZERO, IEEE754Float.N_ZERO, IEEE754Float.N_ZERO},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.P_ZERO, IEEE754Float.N_ZERO},\r\n            {IEEE754Float.P_ZERO, IEEE754Float.P_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.N_ZERO, IEEE754Float.P_ZERO},\r\n            {IEEE754Float.P_ZERO, IEEE754Float.P_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.P_ZERO, IEEE754Float.N_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.P_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.N_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.P_INF, IEEE754Float.P_ZERO, IEEE754Float.NaN},\r\n            {IEEE754Float.P_INF, IEEE754Float.N_ZERO, IEEE754Float.NaN},\r\n            {IEEE754Float.N_INF, IEEE754Float.P_ZERO, IEEE754Float.NaN},\r\n            {IEEE754Float.N_INF, IEEE754Float.N_ZERO, IEEE754Float.NaN}\r\n    };\r\n\r\n    private final String[][] divCorner = new String[][]{\r\n            {IEEE754Float.P_ZERO, IEEE754Float.P_ZERO, IEEE754Float.NaN},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.N_ZERO, IEEE754Float.NaN},\r\n            {IEEE754Float.P_ZERO, IEEE754Float.N_ZERO, IEEE754Float.NaN},\r\n            {IEEE754Float.N_ZERO, IEEE754Float.P_ZERO, IEEE754Float.NaN},\r\n            {IEEE754Float.P_INF, IEEE754Float.P_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.N_INF, IEEE754Float.N_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.P_INF, IEEE754Float.N_INF, IEEE754Float.NaN},\r\n            {IEEE754Float.N_INF, IEEE754Float.P_INF, IEEE754Float.NaN},\r\n    };\r\n\r\n    /**\r\n     * compute the float add of (dest + src)\r\n     */\r\n    public DataType add(DataType src, DataType dest) {\r\n        String destStr = dest.toString();\r\n        String srcStr = src.toString();\r\n        if (destStr.matches(IEEE754Float.NaN_Regular) || srcStr.matches(IEEE754Float.NaN_Regular)) {\r\n            return new DataType(IEEE754Float.NaN);\r\n        }\r\n        String cornerCondition = cornerCheck(addCorner, destStr, srcStr);\r\n        if (null != cornerCondition)\r\n            return new DataType(cornerCondition);\r\n        //corner cases\r\n        String exp1 = destStr.substring(1, 9);\r\n        String exp2 = srcStr.substring(1, 9);\r\n        //get the exp value\r\n        int expVal_1 = Integer.valueOf(exp1, 2);\r\n        int expVal_2 = Integer.valueOf(exp2, 2);\r\n        if (expVal_1 == 255)\r\n            return dest;\r\n        if (expVal_2 == 255)\r\n            return src;\r\n        if (destStr.substring(1).equals(IEEE754Float.P_ZERO.substring(1)))\r\n            return src;\r\n        if (srcStr.substring(1).equals(IEEE754Float.P_ZERO.substring(1)))\r\n            return dest;\r\n        //some other corner cases\r\n        String sig1 = \"\";\r\n        String sig2 = \"\";\r\n        if (expVal_1 == 0) {\r\n            expVal_1++;\r\n            sig1 += \"0\";\r\n        } else sig1 += \"1\";\r\n        if (expVal_2 == 0) {\r\n            expVal_2++;\r\n            sig2 += \"0\";\r\n        } else sig2 += \"1\";\r\n        sig1 = sig1 + destStr.substring(9) + \"000\";\r\n        sig2 = sig2 + srcStr.substring(9) + \"000\";\r\n        int expVal = Math.max(expVal_1, expVal_2);\r\n        if (expVal_1 > expVal_2) {\r\n            sig2 = rightShift(sig2, expVal - expVal_2);\r\n        } else {\r\n            sig1 = rightShift(sig1, expVal - expVal_1);\r\n        }\r\n        String temp = signedADD(sig1, sig2, destStr.charAt(0), srcStr.charAt(0));\r\n        String sig = temp.substring(1);\r\n        String sign = temp.substring(0, 1);\r\n        expVal++;\r\n        while (sig.charAt(0) == '0' && expVal > 0) {\r\n            expVal--;\r\n            sig = sig.substring(1) + '0';\r\n        }\r\n        while (!sig.startsWith(\"00000000000000000000000000\") && expVal < 0) {\r\n            expVal++;\r\n            sig = rightShift(sig, 1);\r\n        }\r\n        if (expVal >= 255)\r\n            return new DataType(sign + \"1111111100000000000000000000000\");\r\n        if (expVal == 0)\r\n            sig = rightShift(sig, 1);\r\n        String exp = Transformer.intToBinary(String.valueOf(expVal)).substring(32 - 8);\r\n        String round = round(sign.charAt(0), exp, sig);\r\n        return new DataType(round);\r\n    }\r\n\r\n    private String signedADD(String sig1, String sig2, char sign1, char sign2) {\r\n        boolean sameSign = sign1 == sign2;\r\n        if (sig1.equals(\"000000000000000000000000000\"))\r\n            return sign2 + sig2;\r\n        if (sig2.equals(\"000000000000000000000000000\"))\r\n            return sign1 + sig1;\r\n\r\n        if (sameSign) {\r\n            int intSig1 = Integer.valueOf(sig1, 2);\r\n            int intSig2 = Integer.valueOf(sig2, 2);\r\n            String intToBinary = Transformer.intToBinary(String.valueOf(intSig1 + intSig2));\r\n            String ansSig = intToBinary.substring(32 - 28);\r\n            return sign1 + ansSig;\r\n        } else {\r\n            int intSig1 = Integer.valueOf(sig1, 2);\r\n            int intSig2 = Integer.valueOf(sig2, 2);\r\n            if (sig1.equals(sig2))\r\n                return \"00000000000000000000000000000\";\r\n            String intToBinary = Transformer.intToBinary(String.valueOf(Math.abs(intSig1 - intSig2)));\r\n            String ansSig = intToBinary.substring(32 - 28);\r\n            return intSig1 > intSig2 ? (sign1 + \"\" + ansSig) : (sign2 + \"\" + ansSig);\r\n        }\r\n    }\r\n\r\n    /**\r\n     * compute the float add of (dest - src)\r\n     */\r\n    public DataType sub(DataType src, DataType dest) {\r\n        String destStr = dest.toString();\r\n        String srcStr = src.toString();\r\n        if(srcStr.charAt(0) == '0')\r\n            srcStr = \"1\" + srcStr.substring(1);\r\n        else srcStr = \"0\" + srcStr.substring(1);\r\n        return add(new DataType(srcStr), dest);\r\n    }\r\n\r\n    /**\r\n     * compute the float mul of (dest * src)\r\n     */\r\n    public DataType mul(DataType src, DataType dest) {\r\n        String srcStr = src.toString();\r\n        String destStr = dest.toString();\r\n        String cornerCheck = cornerCheck(mulCorner, destStr, srcStr);\r\n        if (null != cornerCheck) return new DataType(cornerCheck);\r\n        if(destStr.matches(IEEE754Float.NaN_Regular)||srcStr.matches(IEEE754Float.NaN_Regular))\r\n            return new DataType( IEEE754Float.NaN);\r\n        int exp1 = Integer.valueOf(destStr.substring(1, 9), 2);\r\n        int exp2 = Integer.valueOf(srcStr.substring(1, 9), 2);\r\n        String sig1 = destStr.substring(9);\r\n        String sig2 = srcStr.substring(9);\r\n        if(exp1==0) {\r\n            sig1 = \"0\" + sig1;\r\n            exp1++;\r\n        }else sig1=\"1\"+sig1;\r\n        if(exp2==0){\r\n            sig2=\"0\"+sig2;\r\n            exp2++;\r\n        }else sig2=\"1\"+sig2;\r\n        //get the exponent as add does\r\n        String sign = ((destStr.charAt(0) - '0') ^ (srcStr.charAt(0) - '0')) + \"\";\r\n        //get the sign(final)\r\n        if(exp1==255||exp2==255) return new DataType(sign+\"1111111100000000000000000000000\");\r\n        //corner cases\r\n        int bias=127;\r\n        int exp=exp1+exp2-bias;\r\n        String sigMul = signedMUL(sig1, sig2);\r\n        exp++;\r\n        while (sigMul.charAt(0)=='0'&&exp>0){\r\n            exp--;\r\n            sigMul= sigMul.substring(1) + \"0\";\r\n        }\r\n        while (!sigMul.startsWith(\"000000000000000000000000\")&&exp<0){\r\n            exp++;\r\n            sigMul=rightShift(sigMul,1);\r\n        }\r\n        if(exp>=255)\r\n            return new DataType(sign+\"1111111100000000000000000000000\");\r\n        if(exp==0){\r\n            sigMul=rightShift(sigMul,1);\r\n        }\r\n        if(exp<0)\r\n            return new DataType(sign+\"0000000000000000000000000000000\");\r\n        String expStr=Transformer.intToBinary(String.valueOf(exp)).substring(32-8);\r\n        String round = round(sign.charAt(0), expStr, sigMul);\r\n        return new DataType(round);\r\n    }\r\n    public String nagetify(String val){\r\n        StringBuilder ansBuilder = new StringBuilder();\r\n        for (int i = 0; i < val.length(); i++) {\r\n            ansBuilder.append(val.charAt(i)=='1'?'0':'1');\r\n        }\r\n        return ansBuilder.toString();\r\n    }\r\n    public char getCarry(char x, char y, char c) {\r\n        return (char) (((x - '0') & (y - '0') | (x - '0') & (c - '0') | (c - '0') & (y - '0')) + '0');\r\n    }\r\n\r\n    public char getBit(char x, char y, char c) {\r\n        return ((char) ((x - '0') ^ (y - '0') ^ (c - '0') + '0'));\r\n    }\r\n\r\n    public String carry_adder(String op1, String op2, char c) {\r\n        char carry = c;\r\n        char bit = '0';\r\n        int length = op1.length();\r\n        StringBuilder ansBuilder = new StringBuilder();\r\n        for (int i = length - 1; i >= 0; i--) {\r\n            bit = getBit(op1.charAt(i), op2.charAt(i), carry);\r\n            carry = getCarry(op1.charAt(i), op2.charAt(i), carry);\r\n            ansBuilder.append(bit);\r\n        }\r\n        ansBuilder.append(carry);\r\n        return ansBuilder.reverse().toString();\r\n    }\r\n    private String signedMUL(String sig1,String sig2){\r\n        int length = sig1.length();\r\n        String product=String.join(\"\", Collections.nCopies(length,\"0\"))+sig2;\r\n\r\n        for (int i = length-1; i >=0; i--) {\r\n            char now = product.charAt(2*length-1);\r\n            char carry='0';\r\n            if(now=='1'){\r\n                String carryAdder = carry_adder(product.substring(0, length), sig1, '0');\r\n                carry=carryAdder.charAt(0);\r\n                product=carryAdder.substring(1)+product.substring(length);\r\n            }\r\n            product=carry+product.substring(0,2*length-1);\r\n        }\r\n        return product;\r\n    }\r\n    /**\r\n     * compute the float mul of (dest / src)\r\n     */\r\n    public DataType div(DataType src, DataType dest) {\r\n        String s = src.toString();\r\n        String d = dest.toString();\r\n        if (IEEE754Float.P_ZERO.equals(s) || IEEE754Float.N_ZERO.equals(s)) {\r\n            if ((!IEEE754Float.P_ZERO.equals(d)) && (!IEEE754Float.N_ZERO.equals(d))) {\r\n                throw new ArithmeticException();\r\n            }\r\n        }\r\n        if(s.matches(IEEE754Float.NaN_Regular)||d.matches(IEEE754Float.NaN_Regular))\r\n            return new DataType(IEEE754Float.NaN);\r\n        String cornerCheck = cornerCheck(divCorner, d, s);\r\n        if (null != cornerCheck)\r\n            return new DataType(cornerCheck);\r\n//        //        0/x\r\n        if (d.equals(IEEE754Float.P_ZERO)) {\r\n            return (s.charAt(0) == '0') ? new DataType(IEEE754Float.P_ZERO) : new DataType(IEEE754Float.N_ZERO);\r\n        } else if (d.equals(IEEE754Float.N_ZERO)) {\r\n            return (s.charAt(0) == '1') ? new DataType(IEEE754Float.P_ZERO) : new DataType(IEEE754Float.N_ZERO);\r\n        }\r\n//        Inf/s\r\n        if (d.equals(IEEE754Float.P_INF)) {\r\n            return (s.charAt(0) == '0') ? new DataType(IEEE754Float.P_INF) : new DataType(IEEE754Float.N_INF);\r\n        } else if (d.equals(IEEE754Float.N_INF)) {\r\n            return (s.charAt(0) == '1') ? new DataType(IEEE754Float.P_INF) : new DataType(IEEE754Float.N_INF);\r\n        }\r\n//        d/inf\r\n        if (s.equals(IEEE754Float.P_INF) || s.equals(IEEE754Float.N_INF)) {\r\n            return (d.charAt(0) == '0') ? new DataType(IEEE754Float.P_ZERO) : new DataType(IEEE754Float.N_ZERO);\r\n        }\r\n        String sign = ((d.charAt(0) - '0') ^ (s.charAt(0) - '0')) + \"\";\r\n        String exp1 = d.substring(1, 9);\r\n        String exp2 = s.substring(1, 9);\r\n        String tail1 = d.substring(9);\r\n        String tail2 = s.substring(9);\r\n        int expVal_1 = Integer.valueOf(exp1, 2);\r\n        int expVal_2 = Integer.valueOf(exp2, 2);\r\n//        if (expVal_1 == 255)\r\n//            return new DataType(sign + \"1111111100000000000000000000000\");\r\n        //begin to process the exponent\r\n        if(exp1.equals(\"00000000\")){\r\n            expVal_1++;\r\n            tail1=\"0\"+tail1+\"000\";\r\n            //非规格化数\r\n        }else{\r\n            tail1=\"1\"+tail1+\"000\";\r\n        }\r\n        if(exp2.equals(\"00000000\")) {\r\n            expVal_2++;\r\n            tail2 = \"0\" + tail2 + \"000\";\r\n            //非规格化数\r\n        }else{\r\n            tail2=\"1\"+tail2+\"000\";\r\n        }\r\n        int ei= expVal_1 - expVal_2 + 127;\r\n        StringBuilder ans_tail= new StringBuilder(mydiv(tail1,tail2));\r\n        String ans_exp=Transformer.intToBinary(String.valueOf(ei)).substring(32-8);\r\n        ans_tail =new StringBuilder(ans_tail.substring(75,102));\r\n        if(ei==0){\r\n            ans_tail.insert(0,\"0\");\r\n            ans_tail.delete(27,28);\r\n            return new DataType(round(sign.charAt(0),ans_exp,ans_tail.toString()));\r\n        }else if(ei<0){\r\n            return new DataType(sign.charAt(0)=='0'?IEEE754Float.P_ZERO:IEEE754Float.N_ZERO);\r\n        }else if(ei>=255){\r\n            return new DataType(sign.charAt(0)=='0'?IEEE754Float.P_INF:IEEE754Float.N_INF);\r\n        }else {\r\n            return new DataType(round(sign.charAt(0),ans_exp,ans_tail.toString()));\r\n        }\r\n    }\r\n    public String mydiv(String d, String s) {\r\n        s = \"00000\" + s;\r\n        String ns = Transformer.binaryToInt(s);\r\n        int t = -Integer.parseInt(ns);\r\n        ns = Transformer.intToBinary(String.valueOf(t));\r\n        ns = \"111111111111111111111111111\" + ns;\r\n//        System.out.println(ns);\r\n        StringBuilder A = new StringBuilder(\"000000000000000000000000000000000000000000000000000000\" + d\r\n                + \"000000000000000000000000000\");\r\n        StringBuilder M = new StringBuilder(ns);\r\n        for (int i = 0; i < 54; i++) {\r\n            A.delete(0, 1);\r\n            StringBuilder tmp = new StringBuilder(myadd(A.substring(0, 54), M.toString()));\r\n            if (tmp.charAt(0) == '0') {\r\n//                不够减\r\n                A.append(\"0\");\r\n            } else {\r\n                A.append(\"1\");\r\n                A.replace(0, 54, tmp.toString().substring(1));\r\n            }\r\n        }\r\n        return A.toString();\r\n    }\r\n    public String myadd(String s, String d) {\r\n        String a = new String(\"\");\r\n        int flag = 0;\r\n        for (int i = s.length() - 1; i >= 0; i--) {\r\n            if (s.charAt(i) == '1' && d.charAt(i) == '1' && flag == 1) {\r\n                a = \"1\" + a;\r\n                flag = 1;\r\n            } else if (s.charAt(i) == '1' && d.charAt(i) == '1' && flag == 0) {\r\n                a = \"0\" + a;\r\n                flag = 1;\r\n            } else if (s.charAt(i) == '0' && d.charAt(i) == '1' && flag == 1 ||\r\n                    s.charAt(i) == '1' && d.charAt(i) == '0' && flag == 1) {\r\n                a = \"0\" + a;\r\n                flag = 1;\r\n            } else if (s.charAt(i) == '0' && d.charAt(i) == '1' && flag == 0 ||\r\n                    s.charAt(i) == '1' && d.charAt(i) == '0' && flag == 0) {\r\n                a = \"1\" + a;\r\n                flag = 0;\r\n            } else if (s.charAt(i) == '0' && d.charAt(i) == '0' && flag == 0) {\r\n                a = \"0\" + a;\r\n                flag = 0;\r\n            } else if (s.charAt(i) == '0' && d.charAt(i) == '0' && flag == 1) {\r\n                a = \"1\" + a;\r\n                flag = 0;\r\n            }\r\n        }\r\n        if (flag == 1)\r\n            return \"1\" + a;\r\n        else\r\n            return \"0\" + a;\r\n    }\r\n    /**\r\n     * check corner cases of mul and div\r\n     *\r\n     * @param cornerMatrix corner cases pre-stored\r\n     * @param oprA         first operand (String)\r\n     * @param oprB         second operand (String)\r\n     * @return the result of the corner case (String)\r\n     */\r\n    private String cornerCheck(String[][] cornerMatrix, String oprA, String oprB) {\r\n        for (String[] matrix : cornerMatrix) {\r\n            if (oprA.equals(matrix[0]) && oprB.equals(matrix[1])) {\r\n                return matrix[2];\r\n            }\r\n        }\r\n        return null;\r\n    }\r\n\r\n    /**\r\n     * right shift a num without considering its sign using its string format\r\n     *\r\n     * @param operand to be moved\r\n     * @param n       moving nums of bits\r\n     * @return after moving\r\n     */\r\n    private String rightShift(String operand, int n) {\r\n        StringBuilder result = new StringBuilder(operand);  //保证位数不变\r\n        boolean sticky = false;\r\n        for (int i = 0; i < n; i++) {\r\n            sticky = sticky || result.toString().endsWith(\"1\");\r\n            result.insert(0, \"0\");\r\n            result.deleteCharAt(result.length() - 1);\r\n        }\r\n        if (sticky) {\r\n            result.replace(operand.length() - 1, operand.length(), \"1\");\r\n        }\r\n        return result.substring(0, operand.length());\r\n    }\r\n\r\n    /**\r\n     * 对GRS保护位进行舍入\r\n     *\r\n     * @param sign    符号位\r\n     * @param exp     阶码\r\n     * @param sig_grs 带隐藏位和保护位的尾数\r\n     * @return 舍入后的结果\r\n     */\r\n    private String round(char sign, String exp, String sig_grs) {\r\n        int grs = Integer.parseInt(sig_grs.substring(24, 27), 2);\r\n        if ((sig_grs.substring(27).contains(\"1\")) && (grs % 2 == 0)) {\r\n            grs++;\r\n        }\r\n        String sig = sig_grs.substring(0, 24); // 隐藏位+23位\r\n        if (grs > 4) {\r\n            sig = oneAdder(sig);\r\n        } else if (grs == 4 && sig.endsWith(\"1\")) {\r\n            sig = oneAdder(sig);\r\n        }\r\n\r\n        if (Integer.parseInt(sig.substring(0, sig.length() - 23), 2) > 1) {\r\n            sig = rightShift(sig, 1);\r\n            exp = oneAdder(exp).substring(1);\r\n        }\r\n        if (exp.equals(\"11111111\")) {\r\n            return sign == '0' ? IEEE754Float.P_INF : IEEE754Float.N_INF;\r\n        }\r\n\r\n        return sign + exp + sig.substring(sig.length() - 23);\r\n    }\r\n\r\n    /**\r\n     * add one to the operand\r\n     *\r\n     * @param operand the operand\r\n     * @return result after adding, the first position means overflow (not equal to the carry to the next)\r\n     * and the remains means the result\r\n     */\r\n    private String oneAdder(String operand) {\r\n        int len = operand.length();\r\n        StringBuilder temp = new StringBuilder(operand);\r\n        temp.reverse();\r\n        int[] num = new int[len];\r\n        for (int i = 0; i < len; i++) num[i] = temp.charAt(i) - '0';  //先转化为反转后对应的int数组\r\n        int bit = 0x0;\r\n        int carry = 0x1;\r\n        char[] res = new char[len];\r\n        for (int i = 0; i < len; i++) {\r\n            bit = num[i] ^ carry;\r\n            carry = num[i] & carry;\r\n            res[i] = (char) ('0' + bit);  //显示转化为char\r\n        }\r\n        String result = new StringBuffer(new String(res)).reverse().toString();\r\n        return \"\" + (result.charAt(0) == operand.charAt(0) ? '0' : '1') + result;  //注意有进位不等于溢出，溢出要另外判断\r\n    }\r\n    public static void main(String[] args) {\r\n        Scanner scanner = new Scanner(System.in);\r\n        String a = scanner.next();\r\n        String b = scanner.next();\r\n        System.out.println(a+\"/\"+b);\r\n        FPU fpu = new FPU();\r\n        System.out.println(Transformer.floatToBinary(a));\r\n        System.out.println(Transformer.floatToBinary(b));\r\n        DataType dest = new DataType(Transformer.floatToBinary( a ));\r\n        DataType src = new DataType(Transformer.floatToBinary( b ));\r\n        DataType result = fpu.div(src, dest);\r\n        System.out.println(result.toString());\r\n        float ans = Float.parseFloat(a)/Float.parseFloat(b);\r\n        System.out.println(\"ans is \"+ans);\r\n        String ansBinary = Transformer.floatToBinary(String.valueOf(ans));\r\n        System.out.println(\"ansBinary is \"+ansBinary);\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/src/main/java/cpu/fpu/FPU.java b/src/main/java/cpu/fpu/FPU.java
+--- a/src/main/java/cpu/fpu/FPU.java	(revision deb45f0033173f305c79e16f5d7ed16e8843ef4b)
++++ b/src/main/java/cpu/fpu/FPU.java	(date 1702556452857)
+@@ -2,10 +2,6 @@
+ 
+ import util.DataType;
+ import util.IEEE754Float;
+-import util.Transformer;
+-
+-import java.util.Collections;
+-import java.util.Scanner;
+ 
+ /**
+  * floating point unit
+@@ -62,432 +58,581 @@
+      * compute the float add of (dest + src)
+      */
+     public DataType add(DataType src, DataType dest) {
+-        String destStr = dest.toString();
+-        String srcStr = src.toString();
+-        if (destStr.matches(IEEE754Float.NaN_Regular) || srcStr.matches(IEEE754Float.NaN_Regular)) {
++        String a = src.toString();
++        String b = dest.toString();
++        //第一种情况就是都是Nan
++        if (a.matches(IEEE754Float.NaN_Regular) || b.matches(IEEE754Float.NaN_Regular)) {
+             return new DataType(IEEE754Float.NaN);
+         }
+-        String cornerCondition = cornerCheck(addCorner, destStr, srcStr);
+-        if (null != cornerCondition)
+-            return new DataType(cornerCondition);
+-        //corner cases
+-        String exp1 = destStr.substring(1, 9);
+-        String exp2 = srcStr.substring(1, 9);
+-        //get the exp value
+-        int expVal_1 = Integer.valueOf(exp1, 2);
+-        int expVal_2 = Integer.valueOf(exp2, 2);
+-        if (expVal_1 == 255)
+-            return dest;
+-        if (expVal_2 == 255)
+-            return src;
+-        if (destStr.substring(1).equals(IEEE754Float.P_ZERO.substring(1)))
+-            return src;
+-        if (srcStr.substring(1).equals(IEEE754Float.P_ZERO.substring(1)))
+-            return dest;
+-        //some other corner cases
+-        String sig1 = "";
+-        String sig2 = "";
+-        if (expVal_1 == 0) {
+-            expVal_1++;
+-            sig1 += "0";
+-        } else sig1 += "1";
+-        if (expVal_2 == 0) {
+-            expVal_2++;
+-            sig2 += "0";
+-        } else sig2 += "1";
+-        sig1 = sig1 + destStr.substring(9) + "000";
+-        sig2 = sig2 + srcStr.substring(9) + "000";
+-        int expVal = Math.max(expVal_1, expVal_2);
+-        if (expVal_1 > expVal_2) {
+-            sig2 = rightShift(sig2, expVal - expVal_2);
+-        } else {
+-            sig1 = rightShift(sig1, expVal - expVal_1);
+-        }
+-        String temp = signedADD(sig1, sig2, destStr.charAt(0), srcStr.charAt(0));
+-        String sig = temp.substring(1);
+-        String sign = temp.substring(0, 1);
+-        expVal++;
+-        while (sig.charAt(0) == '0' && expVal > 0) {
+-            expVal--;
+-            sig = sig.substring(1) + '0';
+-        }
+-        while (!sig.startsWith("00000000000000000000000000") && expVal < 0) {
+-            expVal++;
+-            sig = rightShift(sig, 1);
+-        }
+-        if (expVal >= 255)
+-            return new DataType(sign + "1111111100000000000000000000000");
+-        if (expVal == 0)
+-            sig = rightShift(sig, 1);
+-        String exp = Transformer.intToBinary(String.valueOf(expVal)).substring(32 - 8);
+-        String round = round(sign.charAt(0), exp, sig);
+-        return new DataType(round);
+-    }
+-
+-    private String signedADD(String sig1, String sig2, char sign1, char sign2) {
+-        boolean sameSign = sign1 == sign2;
+-        if (sig1.equals("000000000000000000000000000"))
+-            return sign2 + sig2;
+-        if (sig2.equals("000000000000000000000000000"))
+-            return sign1 + sig1;
+-
+-        if (sameSign) {
+-            int intSig1 = Integer.valueOf(sig1, 2);
+-            int intSig2 = Integer.valueOf(sig2, 2);
+-            String intToBinary = Transformer.intToBinary(String.valueOf(intSig1 + intSig2));
+-            String ansSig = intToBinary.substring(32 - 28);
+-            return sign1 + ansSig;
+-        } else {
+-            int intSig1 = Integer.valueOf(sig1, 2);
+-            int intSig2 = Integer.valueOf(sig2, 2);
+-            if (sig1.equals(sig2))
+-                return "00000000000000000000000000000";
+-            String intToBinary = Transformer.intToBinary(String.valueOf(Math.abs(intSig1 - intSig2)));
+-            String ansSig = intToBinary.substring(32 - 28);
+-            return intSig1 > intSig2 ? (sign1 + "" + ansSig) : (sign2 + "" + ansSig);
+-        }
++        //然后就是使用cornerCheck进行检查
++        String cornerCondition = cornerCheck(addCorner, a, b);
++        if (null != cornerCondition) return new DataType(cornerCondition);
++        //？？？？？？
++        String total = new FPUHelper().floatAddition(a, b, 8, 23, 3);
++        return new DataType(total.substring(1));
+     }
+ 
+     /**
+      * compute the float add of (dest - src)
+      */
+     public DataType sub(DataType src, DataType dest) {
+-        String destStr = dest.toString();
+-        String srcStr = src.toString();
+-        if(srcStr.charAt(0) == '0')
+-            srcStr = "1" + srcStr.substring(1);
+-        else srcStr = "0" + srcStr.substring(1);
+-        return add(new DataType(srcStr), dest);
++        String a = dest.toString();
++        String b = src.toString();
++        if (a.matches(IEEE754Float.NaN_Regular) || b.matches(IEEE754Float.NaN_Regular)) {
++            return new DataType(IEEE754Float.NaN);
++        }
++        String cornerCondition = cornerCheck(subCorner, a, b);
++        if (null != cornerCondition) return new DataType(cornerCondition);
++        b = (b.charAt(0) == '0' ? "1" : "0") + b.substring(1);
++        String total = new FPUHelper().floatAddition(a, b, 8, 23, 3);
++        return new DataType(total.substring(1));
+     }
+ 
+     /**
+-     * compute the float mul of (dest * src)
++     * compute the float mul of dest * src
+      */
+     public DataType mul(DataType src, DataType dest) {
+-        String srcStr = src.toString();
+-        String destStr = dest.toString();
+-        String cornerCheck = cornerCheck(mulCorner, destStr, srcStr);
+-        if (null != cornerCheck) return new DataType(cornerCheck);
+-        if(destStr.matches(IEEE754Float.NaN_Regular)||srcStr.matches(IEEE754Float.NaN_Regular))
+-            return new DataType( IEEE754Float.NaN);
+-        int exp1 = Integer.valueOf(destStr.substring(1, 9), 2);
+-        int exp2 = Integer.valueOf(srcStr.substring(1, 9), 2);
+-        String sig1 = destStr.substring(9);
+-        String sig2 = srcStr.substring(9);
+-        if(exp1==0) {
+-            sig1 = "0" + sig1;
+-            exp1++;
+-        }else sig1="1"+sig1;
+-        if(exp2==0){
+-            sig2="0"+sig2;
+-            exp2++;
+-        }else sig2="1"+sig2;
+-        //get the exponent as add does
+-        String sign = ((destStr.charAt(0) - '0') ^ (srcStr.charAt(0) - '0')) + "";
+-        //get the sign(final)
+-        if(exp1==255||exp2==255) return new DataType(sign+"1111111100000000000000000000000");
+-        //corner cases
+-        int bias=127;
+-        int exp=exp1+exp2-bias;
+-        String sigMul = signedMUL(sig1, sig2);
+-        exp++;
+-        while (sigMul.charAt(0)=='0'&&exp>0){
+-            exp--;
+-            sigMul= sigMul.substring(1) + "0";
++        String a = src.toString();
++        String b = dest.toString();
++        if (a.matches(IEEE754Float.NaN_Regular) || b.matches(IEEE754Float.NaN_Regular)) {
++            return new DataType(IEEE754Float.NaN);
+         }
+-        while (!sigMul.startsWith("000000000000000000000000")&&exp<0){
+-            exp++;
+-            sigMul=rightShift(sigMul,1);
+-        }
+-        if(exp>=255)
+-            return new DataType(sign+"1111111100000000000000000000000");
+-        if(exp==0){
+-            sigMul=rightShift(sigMul,1);
+-        }
+-        if(exp<0)
+-            return new DataType(sign+"0000000000000000000000000000000");
+-        String expStr=Transformer.intToBinary(String.valueOf(exp)).substring(32-8);
+-        String round = round(sign.charAt(0), expStr, sigMul);
+-        return new DataType(round);
++        String cornerCondition = cornerCheck(mulCorner, a, b);
++        if (null != cornerCondition) return new DataType(cornerCondition);
++        return new DataType(new FPUHelper().floatMultiplication(a, b).substring(1));
+     }
+-    public String nagetify(String val){
+-        StringBuilder ansBuilder = new StringBuilder();
+-        for (int i = 0; i < val.length(); i++) {
+-            ansBuilder.append(val.charAt(i)=='1'?'0':'1');
+-        }
+-        return ansBuilder.toString();
+-    }
+-    public char getCarry(char x, char y, char c) {
+-        return (char) (((x - '0') & (y - '0') | (x - '0') & (c - '0') | (c - '0') & (y - '0')) + '0');
+-    }
+ 
+-    public char getBit(char x, char y, char c) {
+-        return ((char) ((x - '0') ^ (y - '0') ^ (c - '0') + '0'));
+-    }
+-
+-    public String carry_adder(String op1, String op2, char c) {
+-        char carry = c;
+-        char bit = '0';
+-        int length = op1.length();
+-        StringBuilder ansBuilder = new StringBuilder();
+-        for (int i = length - 1; i >= 0; i--) {
+-            bit = getBit(op1.charAt(i), op2.charAt(i), carry);
+-            carry = getCarry(op1.charAt(i), op2.charAt(i), carry);
+-            ansBuilder.append(bit);
+-        }
+-        ansBuilder.append(carry);
+-        return ansBuilder.reverse().toString();
+-    }
+-    private String signedMUL(String sig1,String sig2){
+-        int length = sig1.length();
+-        String product=String.join("", Collections.nCopies(length,"0"))+sig2;
+-
+-        for (int i = length-1; i >=0; i--) {
+-            char now = product.charAt(2*length-1);
+-            char carry='0';
+-            if(now=='1'){
+-                String carryAdder = carry_adder(product.substring(0, length), sig1, '0');
+-                carry=carryAdder.charAt(0);
+-                product=carryAdder.substring(1)+product.substring(length);
+-            }
+-            product=carry+product.substring(0,2*length-1);
+-        }
+-        return product;
+-    }
+     /**
+-     * compute the float mul of (dest / src)
++     * compute the float mul of dest / src
+      */
+     public DataType div(DataType src, DataType dest) {
+-        String s = src.toString();
+-        String d = dest.toString();
+-        if (IEEE754Float.P_ZERO.equals(s) || IEEE754Float.N_ZERO.equals(s)) {
+-            if ((!IEEE754Float.P_ZERO.equals(d)) && (!IEEE754Float.N_ZERO.equals(d))) {
+-                throw new ArithmeticException();
+-            }
+-        }
+-        if(s.matches(IEEE754Float.NaN_Regular)||d.matches(IEEE754Float.NaN_Regular))
++        String a = dest.toString();
++        String b = src.toString();
++        if (a.matches(IEEE754Float.NaN_Regular) || b.matches(IEEE754Float.NaN_Regular)) {
+             return new DataType(IEEE754Float.NaN);
+-        String cornerCheck = cornerCheck(divCorner, d, s);
+-        if (null != cornerCheck)
+-            return new DataType(cornerCheck);
+-//        //        0/x
+-        if (d.equals(IEEE754Float.P_ZERO)) {
+-            return (s.charAt(0) == '0') ? new DataType(IEEE754Float.P_ZERO) : new DataType(IEEE754Float.N_ZERO);
+-        } else if (d.equals(IEEE754Float.N_ZERO)) {
+-            return (s.charAt(0) == '1') ? new DataType(IEEE754Float.P_ZERO) : new DataType(IEEE754Float.N_ZERO);
+-        }
+-//        Inf/s
+-        if (d.equals(IEEE754Float.P_INF)) {
+-            return (s.charAt(0) == '0') ? new DataType(IEEE754Float.P_INF) : new DataType(IEEE754Float.N_INF);
+-        } else if (d.equals(IEEE754Float.N_INF)) {
+-            return (s.charAt(0) == '1') ? new DataType(IEEE754Float.P_INF) : new DataType(IEEE754Float.N_INF);
+-        }
+-//        d/inf
+-        if (s.equals(IEEE754Float.P_INF) || s.equals(IEEE754Float.N_INF)) {
+-            return (d.charAt(0) == '0') ? new DataType(IEEE754Float.P_ZERO) : new DataType(IEEE754Float.N_ZERO);
+-        }
+-        String sign = ((d.charAt(0) - '0') ^ (s.charAt(0) - '0')) + "";
+-        String exp1 = d.substring(1, 9);
+-        String exp2 = s.substring(1, 9);
+-        String tail1 = d.substring(9);
+-        String tail2 = s.substring(9);
+-        int expVal_1 = Integer.valueOf(exp1, 2);
+-        int expVal_2 = Integer.valueOf(exp2, 2);
+-//        if (expVal_1 == 255)
+-//            return new DataType(sign + "1111111100000000000000000000000");
+-        //begin to process the exponent
+-        if(exp1.equals("00000000")){
+-            expVal_1++;
+-            tail1="0"+tail1+"000";
+-            //非规格化数
+-        }else{
+-            tail1="1"+tail1+"000";
+         }
+-        if(exp2.equals("00000000")) {
+-            expVal_2++;
+-            tail2 = "0" + tail2 + "000";
+-            //非规格化数
+-        }else{
+-            tail2="1"+tail2+"000";
+-        }
+-        int ei= expVal_1 - expVal_2 + 127;
+-        StringBuilder ans_tail= new StringBuilder(mydiv(tail1,tail2));
+-        String ans_exp=Transformer.intToBinary(String.valueOf(ei)).substring(32-8);
+-        ans_tail =new StringBuilder(ans_tail.substring(75,102));
+-        if(ei==0){
+-            ans_tail.insert(0,"0");
+-            ans_tail.delete(27,28);
+-            return new DataType(round(sign.charAt(0),ans_exp,ans_tail.toString()));
+-        }else if(ei<0){
+-            return new DataType(sign.charAt(0)=='0'?IEEE754Float.P_ZERO:IEEE754Float.N_ZERO);
+-        }else if(ei>=255){
+-            return new DataType(sign.charAt(0)=='0'?IEEE754Float.P_INF:IEEE754Float.N_INF);
+-        }else {
+-            return new DataType(round(sign.charAt(0),ans_exp,ans_tail.toString()));
++        if (IEEE754Float.P_ZERO.equals(b) || IEEE754Float.N_ZERO.equals(b)) {
++            if ((!IEEE754Float.P_ZERO.equals(a)) && (!IEEE754Float.N_ZERO.equals(a))) {
++                throw new ArithmeticException();
++            }
+         }
+-    }
+-    public String mydiv(String d, String s) {
+-        s = "00000" + s;
+-        String ns = Transformer.binaryToInt(s);
+-        int t = -Integer.parseInt(ns);
+-        ns = Transformer.intToBinary(String.valueOf(t));
+-        ns = "111111111111111111111111111" + ns;
+-//        System.out.println(ns);
+-        StringBuilder A = new StringBuilder("000000000000000000000000000000000000000000000000000000" + d
+-                + "000000000000000000000000000");
+-        StringBuilder M = new StringBuilder(ns);
+-        for (int i = 0; i < 54; i++) {
+-            A.delete(0, 1);
+-            StringBuilder tmp = new StringBuilder(myadd(A.substring(0, 54), M.toString()));
+-            if (tmp.charAt(0) == '0') {
+-//                不够减
+-                A.append("0");
++        String cornerCondition = cornerCheck(divCorner, a, b);
++        if (null != cornerCondition) return new DataType(cornerCondition);
++        if (IEEE754Float.P_ZERO.equals(a) || IEEE754Float.N_ZERO.equals(a)) {
++            if (a.charAt(0) == b.charAt(0)) {
++                return new DataType(IEEE754Float.P_ZERO);
+             } else {
+-                A.append("1");
+-                A.replace(0, 54, tmp.toString().substring(1));
++                return new DataType(IEEE754Float.N_ZERO);
+             }
+         }
+-        return A.toString();
++        return new DataType(new FPUHelper().floatDivision(a, b).substring(1));
+     }
+-    public String myadd(String s, String d) {
+-        String a = new String("");
+-        int flag = 0;
+-        for (int i = s.length() - 1; i >= 0; i--) {
+-            if (s.charAt(i) == '1' && d.charAt(i) == '1' && flag == 1) {
+-                a = "1" + a;
+-                flag = 1;
+-            } else if (s.charAt(i) == '1' && d.charAt(i) == '1' && flag == 0) {
+-                a = "0" + a;
+-                flag = 1;
+-            } else if (s.charAt(i) == '0' && d.charAt(i) == '1' && flag == 1 ||
+-                    s.charAt(i) == '1' && d.charAt(i) == '0' && flag == 1) {
+-                a = "0" + a;
+-                flag = 1;
+-            } else if (s.charAt(i) == '0' && d.charAt(i) == '1' && flag == 0 ||
+-                    s.charAt(i) == '1' && d.charAt(i) == '0' && flag == 0) {
+-                a = "1" + a;
+-                flag = 0;
+-            } else if (s.charAt(i) == '0' && d.charAt(i) == '0' && flag == 0) {
+-                a = "0" + a;
+-                flag = 0;
+-            } else if (s.charAt(i) == '0' && d.charAt(i) == '0' && flag == 1) {
+-                a = "1" + a;
+-                flag = 0;
+-            }
+-        }
+-        if (flag == 1)
+-            return "1" + a;
+-        else
+-            return "0" + a;
+-    }
+-    /**
+-     * check corner cases of mul and div
+-     *
+-     * @param cornerMatrix corner cases pre-stored
+-     * @param oprA         first operand (String)
+-     * @param oprB         second operand (String)
+-     * @return the result of the corner case (String)
+-     */
++
+     private String cornerCheck(String[][] cornerMatrix, String oprA, String oprB) {
+         for (String[] matrix : cornerMatrix) {
+-            if (oprA.equals(matrix[0]) && oprB.equals(matrix[1])) {
++            if (oprA.equals(matrix[0]) &&
++                    oprB.equals(matrix[1])) {
+                 return matrix[2];
+             }
+         }
+         return null;
+     }
+ 
+-    /**
+-     * right shift a num without considering its sign using its string format
+-     *
+-     * @param operand to be moved
+-     * @param n       moving nums of bits
+-     * @return after moving
+-     */
+-    private String rightShift(String operand, int n) {
+-        StringBuilder result = new StringBuilder(operand);  //保证位数不变
+-        boolean sticky = false;
+-        for (int i = 0; i < n; i++) {
+-            sticky = sticky || result.toString().endsWith("1");
+-            result.insert(0, "0");
+-            result.deleteCharAt(result.length() - 1);
+-        }
+-        if (sticky) {
+-            result.replace(operand.length() - 1, operand.length(), "1");
+-        }
+-        return result.substring(0, operand.length());
+-    }
++    private class FPUHelper {
++
++        /**
++         * add two float number
++         *
++         * @param operand1 first in binary format
++         * @param operand2 second in binary format
++         * @param eLength  exponent's length
++         * @param sLength  significand's length
++         * @param gLength  guard's bits
++         * @return exponent overflow + sign + eLength + sLength
++         */
++        //2个FPUHelper其中所有的选项都可以自定义
++        public String floatAddition(String operand1, String operand2, int eLength, int sLength, int gLength) {
++            //floatAddition加法的特殊情况，如果有0，答案就是另一个，如果有一个是+Inf结果就是Inf
++            if (allZero(operand1.substring(1))) {
++                return "0" + operand2;
++            }
++            if (allZero(operand2.substring(1))) {
++                return "0" + operand1;
++            }
++            //处理阶码，考虑阶码的2种特殊的情况，全0和全1.全0就+1，全1的话，返回本身
++            int Xexponent = Integer.valueOf(operand1.substring(1, 1 + eLength), 2);  //注意这里要加上第二个参数2，不然默认十进制转化
++            int Yexponent = Integer.valueOf(operand2.substring(1, 1 + eLength), 2);
++            if (Xexponent == 0) Xexponent++;  //如果指数是全0，那么指数的真实值为1，因为阶码已经考虑了隐藏位
++            if (Yexponent == 0) Yexponent++;
++            if (Xexponent == 255) {
++                return "0" + operand1;
++            }
++            if (Yexponent == 255) {
++                return "0" + operand2;
++            }
++            //处理尾数：前面加了1位是规格化的
++            StringBuilder Xsig = new StringBuilder(getSignificand(operand1, eLength, sLength));  //get the two significands including the implicit bit
++            StringBuilder Ysig = new StringBuilder(getSignificand(operand2, eLength, sLength));
++            //加上保护胃，1+23+3=27
++            for (int i = 0; i < gLength; i++) {  //add the guard bits
++                Xsig.append("0");
++                Ysig.append("0");
++            }
++            //现在Xsig组成为 隐藏位+sLength+保护位
++            int exponent = Math.max(Xexponent, Yexponent);  //choose the bigger exponent and right shift the smaller one
++            //提取大的然后右移动
++            if (Xexponent != Yexponent) {
++                if (Xexponent > Yexponent) {
++                    Ysig = new StringBuilder(rightShift(Ysig.toString(), Xexponent - Yexponent));
++                } else {
++                    Xsig = new StringBuilder(rightShift(Xsig.toString(), Yexponent - Xexponent));
++                }
++            }
++            //尾码全部0就可以直接输出了
++            if (allZero(Xsig.toString())) {
++                return "0" + operand2;
++            }
++            if (allZero(Ysig.toString())) {
++                return "0" + operand1;
++            }
++            String temp = signedAddition(operand1.charAt(0) + Xsig.toString(), operand2.charAt(0) + Ysig.toString(), Xsig.length());  //需要传入符号。这里直接设置寄存器长度为 Xsig.length() 就可以检测是否溢出，传入参数结构为 符号位+隐藏位+sLength+保护位
++            //temp结构为 溢出位+符号位+隐藏位+sLength+保护位
++            boolean overflow = temp.charAt(0) != '0';
++            char sign = temp.charAt(1);
++            String sig = temp.substring(2);  //sig结构为 隐藏位+sLength+保护位
++            StringBuilder answer = new StringBuilder();
++            //溢出情况
++            if (overflow) {
++                sig = "1" + sig.substring(0, sig.length() - 1);  //右移一位（不可能要移动两次）
++                exponent++;
++                if (exponent == maxValue(eLength)) {  //指数上溢
++                    answer.append("1").append(sign);
++                    answer.append(Integer.toBinaryString(exponent));
++                    for (int i = 0; i < sLength; i++) answer.append("0");  //无穷要求阶码全为0
++                    return answer.toString();
++                }
++            }
++            if (allZero(sig)) {
++                for (int i = 0; i < eLength + sLength + 2; i++) answer.append("0");
++                return answer.toString();
++            }
++            while (sig.charAt(0) != '1' && exponent > 0) {  //规格化
++                sig = leftShift(sig, "1");
++                exponent--;
++            }
++            if (exponent == 0) {  //非规格化数
++                sig = rightShift(sig, 1);
++            }
++            StringBuilder ans_exponent = new StringBuilder(Integer.toBinaryString(exponent));
++            int len = ans_exponent.length();  //注意要先把长度单独写出来，不能写在循环里面
++            for (int i = 0; i < eLength - len; i++) ans_exponent.insert(0, "0");  //补齐到eLength长度
++            return "0" + round(sign, ans_exponent.toString(), sig);
++        }
++
++        /**
++         * multiply two float number
++         *
++         * @param operand1 first in binary format
++         * @param operand2 second in binary format
++         * @return exponent overflow + sign + sLength + eLength
++         */
++        public String floatMultiplication(String operand1, String operand2) {
++            //和原来把输入的拆成，不同的阵容
++            int eLength = 8;
++            int sLength = 23;
++            int bias = (int) ((maxValue(eLength) + 1) / 2 - 1);  //bias
++            int Xexponent = Integer.valueOf(operand1.substring(1, 1 + eLength), 2);  //注意这里要加上第二个参数2，不然默认十进制转化
++            int Yexponent = Integer.valueOf(operand2.substring(1, 1 + eLength), 2);
++            if (Xexponent == 0) Xexponent++;  //如果指数是全0，那么指数的真实值为1，因为阶码已经考虑了隐藏位
++            if (Yexponent == 0) Yexponent++;
++            int exponent = Xexponent + Yexponent - bias;
++            String Xsig = getSignificand(operand1, eLength, sLength);  //get the two significands including the implicit bit
++            String Ysig = getSignificand(operand2, eLength, sLength);
++            int sign = (operand1.charAt(0) - '0') ^ (operand2.charAt(0) - '0');//乘法的符号可以提前决定(异或即可)
++            //处理溢出的情况
++            if (Xexponent == 255) {
++                return "0" + sign + operand1.substring(1);
++            }
++            if (Yexponent == 255) {
++                return "0" + sign + operand2.substring(1);
++            }
++            //2位隐藏位+23+3
++            String temp = unsignedMultiplication(Xsig, Ysig, Xsig.length() * 2);  // 无符号数的乘法
++            StringBuilder answer = new StringBuilder();
++            exponent++;  //前两位都是隐藏位，因此要移动一位小数点
++            //和
++            while (temp.charAt(0) == '0' && exponent > 0) {
++                temp = leftShift(temp, "1");
++                exponent--;
++            }//右移规格化
++            while (!allZero(temp.substring(0, 1 + sLength)) && exponent < 0) {  //右移规格化
++                temp = rightShift(temp, 1);
++                exponent++;
++            }
++            //无穷de情况
++            if (exponent >= bias * 2 + 1) {  //infinite
++                answer.append("1");
++                answer.append(sign);
++                for (int i = 0; i < eLength; i++) answer.append(1);
++                answer.append(getAllZeros(sLength));
++                return answer.toString();
++            }
++            if (exponent == 0) {  //非规格化数
++                temp = rightShift(temp, 1);
++            }
++            if (exponent < 0) {  //乘法和除法有可能指数小于0，指数下溢，处理成0
++                answer.append("0" + sign);
++                answer.append(getAllZeros(sLength + eLength));
++                return answer.toString();
++            }
++            //组织一下答案
++            String ans_exponent = Integer.toBinaryString(exponent);
++            int len = ans_exponent.length();
++            for (int i = 0; i < eLength - len; i++) ans_exponent = "0" + ans_exponent;  //补齐到eLength长度
++            return "0" + round((char) (sign + 48), ans_exponent, temp);
++        }
++
++        /**
++         * unsigned integer multiplication
++         *
++         * @param operand1 first
++         * @param operand2 second
++         * @param length   operand1.length()*2
++         * @return length*2
++         */
++        public String unsignedMultiplication(String operand1, String operand2, int length) {
++            String X = impleDigits(operand1, length / 2);  //length为寄存器长度，因此操作数长度只能为length的一半
++            operand2 = impleDigits(operand2, length / 2);
++            StringBuffer productBuffer = new StringBuffer();
++            for (int i = 0; i < length / 2; i++) productBuffer = productBuffer.append("0");
++            String product = productBuffer.toString() + operand2;
++            for (int i = 0; i < length / 2; i++) {
++                int Y = product.charAt(length - 1) - '0';
++                char carry = '0';
++                if (Y == 1) {
++                    String temp = carry_adder(product.substring(0, length / 2), X, '0', length / 2);  //这里不能用adder，因为length长度不一定为4的倍数
++                    carry = temp.charAt(0);  //carry_adder的溢出即为有进位
++                    product = temp.substring(1) + product.substring(length / 2);
++                }
++                product = carry + product.substring(0, product.length() - 1);  //carry为隐藏进位
++            }
++            return product;
++        }
++
++        /**
++         * divide two float number: oprand1 / oprand2
++         *
++         * @param operand1 first in binary format
++         * @param operand2 second in binary format
++         * @return exponent overflow + sign + sLength + eLength
++         */
++        public String floatDivision(String operand1, String operand2) {
++            int eLength = 8;
++            int sLength = 23;
++            int gLength = 3;
++            int sign = (operand1.charAt(0) - '0') ^ (operand2.charAt(0) - '0');
++            int bias = (int) ((maxValue(eLength) + 1) / 2 - 1);  //bias
++            int Xexponent = Integer.valueOf(operand1.substring(1, 1 + eLength), 2);  //注意这里要加上第二个参数2，不然默认十进制转化
++            int Yexponent = Integer.valueOf(operand2.substring(1, 1 + eLength), 2);
++            if (Xexponent == 0) Xexponent++;  //如果指数是全0，那么指数的真实值为1，因为阶码已经考虑了隐藏位
++            if (Yexponent == 0) Yexponent++;
++            String Xsig = getSignificand(operand1, eLength, sLength);  //get the two significands including the implicit bit
++            String Ysig = getSignificand(operand2, eLength, sLength);
++            for (int i = 0; i < gLength; i++) {  //add the guard bits
++                Xsig += "0";
++                Ysig += "0";
++            }
++            int exponent = Xexponent - Yexponent + bias;
++            String temp = unsignedDivision(Xsig, Ysig);  // 无符号数的除法
++            StringBuilder answer = new StringBuilder();
++            //特殊除法，第一位就是隐藏位
++            while (temp.charAt(0) == '0' && exponent > 0) {
++                temp = leftShift(temp, "1");
++                exponent--;
++            }
++            while (!allZero(temp.substring(0, 1 + sLength)) && exponent < 0) {  //右移规格化
++                temp = rightShift(temp, 1);
++                exponent++;
++            }
++            if (exponent >= bias * 2 + 1) {  //infinite
++                answer.append("1");
++                answer.append(sign);
++                for (int i = 0; i < eLength; i++) answer.append(1);
++                answer.append(getAllZeros(sLength));
++                return answer.toString();
++            }
++            if (exponent == 0) {  //非规格化数
++                temp = rightShift(temp, 1);
++            }
++            if (exponent < 0) {  //乘法和除法有可能指数小于0，指数下溢，处理成0
++                answer.append("0" + sign);
++                answer.append(getAllZeros(sLength + eLength));
++                return answer.toString();
++            }
++            String ans_exponent = Integer.toBinaryString(exponent);
++            int len = ans_exponent.length();
++            for (int i = 0; i < eLength - len; i++) ans_exponent = "0" + ans_exponent;  //补齐到eLength长度
++            return "0" + round((char) (sign + 48), ans_exponent, temp);
++        }
++
++        /**
++         * unsigned integer division
++         *
++         * @param operand1 first
++         * @param operand2 second
++         * @return length*2
++         */
++        public String unsignedDivision(String operand1, String operand2) {
++            String quotient = "";
++            String product = operand1;  //0扩展
++            for (int i = 0; i < operand1.length(); i++) product += "0";  //直接在后面加0
++            for (int i = 0; i < operand1.length(); i++) {
++                String temp = carry_adder(product.substring(0, operand1.length()), negation(operand2), '1', operand2.length()).substring(1);
++                if (temp.charAt(0) == '0') product = temp.substring(1) + product.substring(operand1.length()) + "1";
++                else product = leftShift(product, "1");
++            }
++            quotient = product.substring(operand1.length());
++            return quotient;
++        }
++
++        /**
++         * get a string of all '0'
++         *
++         * @param length
++         * @return all '0' of length
++         */
++        public String getAllZeros(int length) {
++            StringBuffer res = new StringBuffer();
++            for (int i = 0; i < length; i++) res.append('0');
++            return res.toString();
++        }
++
++        /**
++         * left shift a num using its string format
++         * e.g. "00001001" left shift 2 bits -> "00100100"
++         *
++         * @param operand to be moved
++         * @param n       moving nums of bits
++         * @return after moving
++         */
++        public String leftShift(String operand, String n) {
++            StringBuffer result = new StringBuffer(operand.substring(Integer.parseInt(n)));  //保证位数不变
++            for (int i = 0; i < Integer.parseInt(n); i++) {
++                result = result.append("0");
++            }
++            return result.toString();
++        }
++
++        /**
++         * right shitf a num without considering its sign using its string format
++         *
++         * @param operand to be moved
++         * @param n       moving nums of bits
++         * @return after moving
++         */
++        public String rightShift(String operand, int n) {
++            StringBuilder result = new StringBuilder(operand);  //保证位数不变
++            boolean sticky = false;
++            for (int i = 0; i < n; i++) {
++                sticky = sticky || result.toString().endsWith("1");
++                result.insert(0, "0");
++                result.deleteCharAt(result.length() - 1);
++            }
++            if (sticky) {
++                result.replace(operand.length() - 1, operand.length(), "1");
++            }
++            return result.substring(0, operand.length());
++        }
+ 
+-    /**
+-     * 对GRS保护位进行舍入
+-     *
+-     * @param sign    符号位
+-     * @param exp     阶码
+-     * @param sig_grs 带隐藏位和保护位的尾数
+-     * @return 舍入后的结果
+-     */
+-    private String round(char sign, String exp, String sig_grs) {
+-        int grs = Integer.parseInt(sig_grs.substring(24, 27), 2);
+-        if ((sig_grs.substring(27).contains("1")) && (grs % 2 == 0)) {
+-            grs++;
+-        }
+-        String sig = sig_grs.substring(0, 24); // 隐藏位+23位
+-        if (grs > 4) {
+-            sig = oneAdder(sig);
+-        } else if (grs == 4 && sig.endsWith("1")) {
+-            sig = oneAdder(sig);
+-        }
++        /**
++         * check if the given string is full of '0'
++         *
++         * @param string given string
++         * @return result
++         */
++        public boolean allZero(String string) {
++            for (char c : string.toCharArray()) {
++                if (c != '0') return false;
++            }
++            return true;
++        }
++
++        /**
++         * calculate the max value (true value) with the given length of bits
++         *
++         * @param length given length
++         * @return result
++         */
++        public double maxValue(int length) {
++            //不能使用移位操作
++            return Math.pow(2, length) - 1;
++        }
++
++        /**
++         * get the significand bits includes the implicit bit considering the subnormal number
++         *
++         * @param operand number string in the binary format
++         * @param eLength exponent's length
++         * @param sLength significand's length
++         * @return result string including the implicit bit
++         */
++        public String getSignificand(String operand, int eLength, int sLength) {
++            String exponent = operand.substring(1, 1 + eLength);
++            if (Integer.parseInt(exponent) == 0) return "0" + operand.substring(1 + eLength);  //subnormal number
++            else return "1" + operand.substring(1 + eLength);
++        }
++
++        /**
++         * given a length, make operand to that digits considering the sign
++         *
++         * @param operand given num
++         * @param length  make complete
++         * @return completed string
++         */
++        private String impleDigits(String operand, int length) {
++            int len = length - operand.length();
++            char imple = operand.charAt(0);
++            StringBuffer res = new StringBuffer(new StringBuffer(operand).reverse());
++            for (int i = 0; i < len; i++) {
++                res = res.append(imple);
++            }
++            return res.reverse().toString();
++        }
++
++        /**
++         * sign-magnitude representation add
++         *
++         * @param operand1 sign-magnitude
++         * @param operand2 sign-magnitude
++         * @param length   length of the rigister(larger than the number's length without the sign)
++         * @return 2+length, first presents overflow, second presents the sign and remain means result(length equal to the given length)
++         */
++        public String signedAddition(String operand1, String operand2, int length) {  //溢出规则和补码不一样，因此这里用了另外一种adder，可以判断是否有进位
++            String a = operand1.substring(1);  //取出绝对值
++            if (a.length() < length) a = impleDigits("0" + operand1.substring(1), length);  //扩展到寄存器长度
++            String b = operand2.substring(1);
++            if (b.length() < length) b = impleDigits("0" + operand2.substring(1), length);
++            if (allZero(a)) return operand2;  //0的情况单独判断，不然下面减法会出错
++            if (allZero(b)) return operand1;
++            if (operand1.charAt(0) == operand2.charAt(0)) {  //同号做加法
++                String temp = carry_adder(a, b, '0', length);
++                return "" + temp.charAt(0) + operand1.charAt(0) + temp.substring(1);  //有进位即溢出
++            } else {  //异号做减法，此时不可能溢出
++                b = oneAdder(negation(b)).substring(1);  //取反加一，0的补没有意义，先前已经被排除
++                String temp = carry_adder(a, b, '0', length);
++                if (temp.charAt(0) == '1') return "0" + operand1.charAt(0) + temp.substring(1);  //如果有进位则正常，符号和被减数一样
++                return "0" + negation("" + operand1.charAt(0)) + oneAdder(negation(temp.substring(1))).substring(1);  //没有进位就取反加一，并且符号和被减数相反
++            }
++        }
++
++        /**
++         * add two nums with the length of given length which could be divided by 4, and the result's first bit presents the overflow
++         * different from the {@code adder} method, the result's first bit presents whether it generates the carry
++         *
++         * @param operand1 first
++         * @param operand2 second
++         * @param c        original carray
++         * @param length   given length
++         * @return result, and the result's first bit presents the carry
++         */
++        public String carry_adder(String operand1, String operand2, char c, int length) {
++            operand1 = impleDigits(operand1, length);
++            operand2 = impleDigits(operand2, length);
++            String res = "";
++            char carry = c;
++            for (int i = length - 1; i >= 0; i--) {  //这里length不一定是4的倍数，采用更加通用的加法算法
++                String temp = fullAdder(operand1.charAt(i), operand2.charAt(i), carry);
++                carry = temp.charAt(0);
++                res = temp.charAt(1) + res;
++            }
++            return carry + res;  //注意这个方法里面溢出即有进位
++        }
++
++        /**
++         * add one to the operand
++         *
++         * @param operand the operand
++         * @return result after adding, the first position means overflow (not equal to the carray to the next) and the remains means the result
++         */
++        public String oneAdder(String operand) {
++            int len = operand.length();
++            StringBuffer temp = new StringBuffer(operand);
++            temp = temp.reverse();
++            int[] num = new int[len];
++            for (int i = 0; i < len; i++) num[i] = temp.charAt(i) - '0';  //先转化为反转后对应的int数组
++            int bit = 0x0;
++            int carry = 0x1;
++            char[] res = new char[len];
++            for (int i = 0; i < len; i++) {
++                bit = num[i] ^ carry;
++                carry = num[i] & carry;
++                res[i] = (char) ('0' + bit);  //显示转化为char
++            }
++            String result = new StringBuffer(new String(res)).reverse().toString();
++            return "" + (result.charAt(0) == operand.charAt(0) ? '0' : '1') + result;  //注意有进位不等于溢出，溢出要另外判断
++        }
++
++        /**
++         * the 2 bits' full adder
++         *
++         * @param x first char
++         * @param y second char
++         * @param c carry from the former bit
++         * @return result after adding, the first position means the carry to the next and second means the result in this position
++         */
++        public String fullAdder(char x, char y, char c) {
++            int bit = (x - '0') ^ (y - '0') ^ (c - '0');  //三位异或
++            int carry = ((x - '0') & (y - '0')) | ((y - '0') & (c - '0')) | ((x - '0') & (c - '0'));  //有两位为1则产生进位
++            return "" + carry + bit;  //第一个空串让后面的加法都变为字符串加法
++        }
++
++        /**
++         * convert the string's 0 and 1.
++         * e.g 00000 to 11111
++         *
++         * @param operand string to convert (by default, it is 32 bits long)
++         * @return string after converting
++         */
++        public String negation(String operand) {
++            StringBuffer result = new StringBuffer();
++            for (int i = 0; i < operand.length(); i++) {
++                result = operand.charAt(i) == '1' ? result.append("0") : result.append("1");
++            }
++            return result.toString();
++        }
++
++        /**
++         * 对GRS保护位进行舍入
++         *
++         * @param sign    符号位
++         * @param exp     阶码
++         * @param sig_grs 带隐藏位和保护位的尾数
++         * @return 舍入后的结果
++         */
++        public String round(char sign, String exp, String sig_grs) {
++            int grs = Integer.parseInt(sig_grs.substring(24, 27), 2);
++            if ((sig_grs.substring(27).contains("1")) && (grs % 2 == 0)) {
++                grs++;
++            }
++            String sig = sig_grs.substring(0, 24); // 隐藏位+23位
++            if (grs > 4 || (grs == 4 && sig.endsWith("1"))) {
++                sig = oneAdder(sig);
++                if (sig.charAt(0) == '1') {
++                    exp = oneAdder(exp).substring(1);
++                    sig = sig.substring(1);
++                }
++            }
+ 
+-        if (Integer.parseInt(sig.substring(0, sig.length() - 23), 2) > 1) {
+-            sig = rightShift(sig, 1);
+-            exp = oneAdder(exp).substring(1);
+-        }
+-        if (exp.equals("11111111")) {
+-            return sign == '0' ? IEEE754Float.P_INF : IEEE754Float.N_INF;
+-        }
++            if (Integer.parseInt(sig.substring(0, sig.length() - 23), 2) > 1) {
++                sig = rightShift(sig, 1);
++                exp = oneAdder(exp).substring(1);
++            }
++            if (exp.equals("11111111")) {
++                return sign == '0' ? IEEE754Float.P_INF : IEEE754Float.N_INF;
++            }
+ 
+-        return sign + exp + sig.substring(sig.length() - 23);
+-    }
+-
+-    /**
+-     * add one to the operand
+-     *
+-     * @param operand the operand
+-     * @return result after adding, the first position means overflow (not equal to the carry to the next)
+-     * and the remains means the result
+-     */
+-    private String oneAdder(String operand) {
+-        int len = operand.length();
+-        StringBuilder temp = new StringBuilder(operand);
+-        temp.reverse();
+-        int[] num = new int[len];
+-        for (int i = 0; i < len; i++) num[i] = temp.charAt(i) - '0';  //先转化为反转后对应的int数组
+-        int bit = 0x0;
+-        int carry = 0x1;
+-        char[] res = new char[len];
+-        for (int i = 0; i < len; i++) {
+-            bit = num[i] ^ carry;
+-            carry = num[i] & carry;
+-            res[i] = (char) ('0' + bit);  //显示转化为char
++            return sign + exp + sig.substring(sig.length() - 23);
+         }
+-        String result = new StringBuffer(new String(res)).reverse().toString();
+-        return "" + (result.charAt(0) == operand.charAt(0) ? '0' : '1') + result;  //注意有进位不等于溢出，溢出要另外判断
+     }
+-    public static void main(String[] args) {
+-        Scanner scanner = new Scanner(System.in);
+-        String a = scanner.next();
+-        String b = scanner.next();
+-        System.out.println(a+"/"+b);
+-        FPU fpu = new FPU();
+-        System.out.println(Transformer.floatToBinary(a));
+-        System.out.println(Transformer.floatToBinary(b));
+-        DataType dest = new DataType(Transformer.floatToBinary( a ));
+-        DataType src = new DataType(Transformer.floatToBinary( b ));
+-        DataType result = fpu.div(src, dest);
+-        System.out.println(result.toString());
+-        float ans = Float.parseFloat(a)/Float.parseFloat(b);
+-        System.out.println("ans is "+ans);
+-        String ansBinary = Transformer.floatToBinary(String.valueOf(ans));
+-        System.out.println("ansBinary is "+ansBinary);
+-    }
+-}
++
++}
+\ No newline at end of file
+Index: 2023.iml
+===================================================================
+diff --git a/2023.iml b/2023.iml
+deleted file mode 100644
+--- a/2023.iml	(revision deb45f0033173f305c79e16f5d7ed16e8843ef4b)
++++ /dev/null	(revision deb45f0033173f305c79e16f5d7ed16e8843ef4b)
+@@ -1,16 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<module org.jetbrains.idea.maven.project.MavenProjectsManager.isMavenModule="true" type="JAVA_MODULE" version="4">
+-  <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_1_8">
+-    <output url="file://$MODULE_DIR$/target/classes" />
+-    <output-test url="file://$MODULE_DIR$/target/test-classes" />
+-    <content url="file://$MODULE_DIR$">
+-      <sourceFolder url="file://$MODULE_DIR$/src/main/java" isTestSource="false" />
+-      <sourceFolder url="file://$MODULE_DIR$/src/test/java" isTestSource="true" />
+-      <excludeFolder url="file://$MODULE_DIR$/target" />
+-    </content>
+-    <orderEntry type="inheritedJdk" />
+-    <orderEntry type="sourceFolder" forTests="false" />
+-    <orderEntry type="library" scope="TEST" name="Maven: junit:junit:4.12" level="project" />
+-    <orderEntry type="library" scope="TEST" name="Maven: org.hamcrest:hamcrest-core:1.3" level="project" />
+-  </component>
+-</module>
+\ No newline at end of file

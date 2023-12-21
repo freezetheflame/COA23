@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="6ee2a381-79ca-4358-8257-fb6c7ed607e5" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/2023.iml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/cpu/fpu/FPU.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/cpu/fpu/FPU.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/util/Transformer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/util/Transformer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/test/java/cpu/fpu/FPUAddTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/cpu/fpu/FPUAddTest.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$/.." value="deb45f0033173f305c79e16f5d7ed16e8843ef4b" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="GitToolBoxStore">
+    <option name="projectConfigVersion" value="5" />
+    <option name="recentBranches">
+      <RecentBranches>
+        <option name="branchesForRepo">
+          <list>
+            <RecentBranchesForRepo>
+              <option name="branches">
+                <list>
+                  <RecentBranch>
+                    <option name="branchName" value="master" />
+                    <option name="lastUsedInstant" value="1702391137" />
+                  </RecentBranch>
+                </list>
+              </option>
+              <option name="repositoryRootUrl" value="file://$PROJECT_DIR$/.." />
+            </RecentBranchesForRepo>
+          </list>
+        </option>
+      </RecentBranches>
+    </option>
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 0
+}</component>
+  <component name="ProjectId" id="2Z1DwJRBYw3m6OimfZrfAh6hBZ3" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;0dc09e1f&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/projects/f0398a33e51c463687f50cf6f6b01df5/186-coa2023-programming03&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;vcs.Git&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RunManager">
+    <configuration name="FPUAddTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="2023" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="cpu.fpu.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="cpu.fpu" />
+      <option name="MAIN_CLASS_NAME" value="cpu.fpu.FPUAddTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="FPUAddTest.fpuAddTest1" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="2023" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="cpu.fpu.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="cpu.fpu" />
+      <option name="MAIN_CLASS_NAME" value="cpu.fpu.FPUAddTest" />
+      <option name="METHOD_NAME" value="fpuAddTest1" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="FPUDivTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="2023" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="cpu.fpu.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="cpu.fpu" />
+      <option name="MAIN_CLASS_NAME" value="cpu.fpu.FPUDivTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="FPUDivTest.fpuDivTest3" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="2023" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="cpu.fpu.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="cpu.fpu" />
+      <option name="MAIN_CLASS_NAME" value="cpu.fpu.FPUDivTest" />
+      <option name="METHOD_NAME" value="fpuDivTest3" />
+      <option name="TEST_OBJECT" value="method" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="FPUMulTest" type="JUnit" factoryName="JUnit" temporary="true" nameIsGenerated="true">
+      <module name="2023" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="cpu.fpu.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <option name="PACKAGE_NAME" value="cpu.fpu" />
+      <option name="MAIN_CLASS_NAME" value="cpu.fpu.FPUMulTest" />
+      <option name="TEST_OBJECT" value="class" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="187-coa2023-programming04" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="187-coa2023-programming04" />
+      <option name="filePath" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="JUnit.FPUDivTest.fpuDivTest3" />
+        <item itemvalue="JUnit.FPUAddTest" />
+        <item itemvalue="JUnit.FPUMulTest" />
+        <item itemvalue="JUnit.FPUAddTest.fpuAddTest1" />
+        <item itemvalue="JUnit.FPUDivTest" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="6ee2a381-79ca-4358-8257-fb6c7ed607e5" name="Changes" comment="" />
+      <created>1701580929849</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1701580929849</updated>
+      <workItem from="1701580930861" duration="9303000" />
+      <workItem from="1701923460852" duration="40000" />
+      <workItem from="1702362859747" duration="4030000" />
+      <workItem from="1702378791925" duration="16424000" />
+      <workItem from="1702397477917" duration="35000" />
+      <workItem from="1702552545874" duration="7012000" />
+      <workItem from="1702658848859" duration="12118000" />
+      <workItem from="1702734565187" duration="14776000" />
+      <workItem from="1702780670679" duration="6024000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/cpu/fpu/FPU.java</url>
+          <line>403</line>
+          <option name="timeStamp" value="16" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>file://$PROJECT_DIR$/src/main/java/cpu/fpu/FPU.java</url>
+          <line>398</line>
+          <option name="timeStamp" value="24" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+    <watches-manager>
+      <configuration name="JUnit">
+        <watch expression="M.coder" />
+      </configuration>
+    </watches-manager>
+  </component>
+</project>
