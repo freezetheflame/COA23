@@ -109,7 +109,6 @@ public class Transformer {
                 value *= 2;
                 exponent--;
             }
-
             value = Float.parseFloat(floatStr);
             exponent += 127;
             //get the exponent part
