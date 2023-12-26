@@ -69,14 +69,6 @@ public class Cache {
         }
         return data;
     }
-
-    /**
-     * 向cache中写入[pAddr, pAddr + len)范围内的连续数据，可能包含多个数据块的内容
-     *
-     * @param pAddr 数据起始点(32位物理地址 = 26位块号 + 6位块内地址)
-     * @param len   待写数据的字节数
-     * @param data  待写数据
-     */
     public void write(String pAddr, int len, byte[] data) {
         int addr = Integer.parseInt(Transformer.binaryToInt("0" + pAddr));
         int upperBound = addr + len;
@@ -97,22 +89,36 @@ public class Cache {
             //TODO but done
             //write the data according to the write strategy
             //1. write through
-            //TODO
             if(!isWriteBack){
+                //dirty bit is always 0
+                //write the data to memory
+                Memory.getMemory().write(pAddr, len, data);
+                //update the cache and using strategy
                 addTimeStamp();
-                Memory.getMemory().write(pAddr,len,data);
-                update(rowNO,pAddr.substring(0,26).toCharArray(),data);
+                update(rowNO, getTag(pAddr), cache_data);
                 setTimeStamp(rowNO);
             }
             else{
+                //get the dirty bit
+                cache[rowNO].dirty = true;
+                //update the cache and using strategy
                 addTimeStamp();
-                setDirty(rowNO);
-                update(rowNO,pAddr.substring(0,26).toCharArray(),data);
+                update(rowNO, getTag(pAddr), cache_data);
                 setTimeStamp(rowNO);
             }
+
             addr += nextSegLen;
         }
     }
+
+    /**
+     * 向cache中写入[pAddr, pAddr + len)范围内的连续数据，可能包含多个数据块的内容
+     *
+     * @param pAddr 数据起始点(32位物理地址 = 26位块号 + 6位块内地址)
+     * @param len   待写数据的字节数
+     * @param data  待写数据
+     */
+
 
 
     /**
@@ -123,49 +129,81 @@ public class Cache {
      * @return 数据块在Cache中的对应行号
      */
     private int fetch(String pAddr) {
-        //TODO but done
-        int blockNO =   Integer.parseInt(Transformer.binaryToInt(pAddr.substring(0,26)));
+        int blockNO = Integer.parseInt(Transformer.binaryToInt(pAddr.substring(0,26)));
         int rowNO = map(blockNO);
-        int start = (blockNO%SETS)*setSize;
-        int end = start +  setSize;
+        int start  = (blockNO%SETS)*setSize;
+        int end = start + setSize;
         char[] tag = getTag(pAddr);
-        if(rowNO==-1){
-            //not found
-                //get the whole LINE
-                byte[] data = Memory.getMemory().read(pAddr.substring(0,26)+"000000",LINE_SIZE_B);
-                int available_line = -1;
-                for(int j = start;j <end;j++){
-                    if(!cache[j].validBit){
-                        available_line = j;
-                        break;
-                    }
-                }
-                if(available_line==-1){
-                    int replace = replacementStrategy.replace(start,end,tag,data);
-                    if(cache[replace].dirty){
-                        //if the dirty bit is 1
-                        //write the data to memory
-                        Memory.getMemory().write(pAddr.substring(0,26)+"000000", LINE_SIZE_B, cache[replace].getData());
-                        cache[replace].dirty = false;
-                    }
-                    addTimeStamp();
-                    update(replace,tag,data);
-                    setTimeStamp(replace);
-                    return replace;
-                } else{
-                    addTimeStamp();
-                    update(available_line,tag,data);
-                    setTimeStamp(available_line);
-                    rowNO = available_line;
-                }
-
-        }
-        else{
-            //directly get the value
+        if(rowNO!=-1){
             replacementStrategy.hit(rowNO);
             return rowNO;
         }
-        return rowNO;
+        else{
+            //load from memory
+            byte[] data = Memory.getMemory().read(pAddr.substring(0,26)+"000000",LINE_SIZE_B);
+            int available =  -1;
+            for(int j = start;j<end;j++){
+                if(!cache[j].validBit){
+                    available = j;
+                    break;
+                }
+            }
+            if(available!=-1){
+                addTimeStamp();
+                //there is an available line
+                update(available,tag,data);
+                return available;
+            }
+            else {
+                int row = replacementStrategy.replace(start,end,tag,data);
+                update(row,tag,data);
+                addTimeStamp();
+                return row;
+            }
+        }
+//        //TODO but done
+//        int blockNO =   Integer.parseInt(Transformer.binaryToInt(pAddr.substring(0,26)));
+//        int rowNO = map(blockNO);
+//        int start = (blockNO%SETS)*setSize;
+//        int end = start +  setSize;
+//        char[] tag = getTag(pAddr);
+//        if(rowNO==-1){
+//            //not found
+//                //get the whole LINE
+//                byte[] data = Memory.getMemory().read(pAddr.substring(0,26)+"000000",LINE_SIZE_B);
+//                int available_line = -1;
+//                for(int j = start;j <end;j++){
+//                    if(!cache[j].validBit){
+//                        available_line = j;
+//                        break;
+//                    }
+//                }
+//                if(available_line==-1){
+//                    int replace = replacementStrategy.replace(start,end,tag,data);
+//                    if(cache[replace].dirty){
+//                        //if the dirty bit is 1
+//                        //write the data to memory
+//                        Memory.getMemory().write(pAddr.substring(0,26)+"000000", LINE_SIZE_B, cache[replace].getData());
+//                        cache[replace].dirty = false;
+//                    }
+//                    addTimeStamp();
+//                    update(replace,tag,data);
+//                    setTimeStamp(replace);
+//                    return replace;
+//                } else{
+//                    addTimeStamp();
+//                    update(available_line,tag,data);
+//                    setTimeStamp(available_line);
+//                    rowNO = available_line;
+//                }
+//
+//        }
+//        else{
+//            //directly get the value
+//            replacementStrategy.hit(rowNO);
+//            return rowNO;
+//        }
+//        return rowNO;
     }
 
     public char[] getTag(String pAddr){
@@ -227,6 +265,7 @@ public class Cache {
         cache[rowNO].validBit = true;
         cache[rowNO].data = input;
         cache[rowNO].tag = tag;
+        //setTimeStamp(rowNO);
         //cache[rowNO].dirty = true;
         //replacementStrategy.hit(rowNO);
     }

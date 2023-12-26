@@ -45,6 +45,17 @@ public class ALU {
      * @param dest 32-bits
      * @return 32-bits
      */
+    /*
+    * 实现逻辑（以不恢复余数除法为例）：
+1.输入检查、特殊情况处理（除法错、0做被除数等）
+2.判断X和Y符号：
+同号：执行X -Y
+异号：执行X + Y
+ 3.判断X和Y符号：
+同号：X和Z左移一位最低位补1，X=2X-Y
+异号：X和Z左移一位最低位补0，X=2X+Y
+重复此步骤直到完成第32 次循环
+    * */
     public DataType div(DataType src, DataType dest) {
         String SRC = src.toString();
         String DEST = dest.toString();
@@ -72,11 +83,21 @@ public class ALU {
         DataType ans = new DataType(DEST.charAt(0) == SRC.charAt(0) ? res.toString() : add(res.toString(), "00000000000000000000000000000001"));
 
         remainderReg = new DataType(builder.substring(0, 32));
-
+        /*
+        * 余数修正：
+        X和被除数同号：不修正
+        X和被除数异号& 被除数和Y同号：X=X+Y
+        X和被除数异号& 被除数和Y异号：X=X-Y
+        * */
         if(DEST.charAt(0) != remainderReg.toString().charAt(0)){
             remainderReg = new DataType(add(DEST.charAt(0) == SRC.charAt(0) ? SRC : NEG_SRC, remainderReg.toString()));
         }
-
+        /*
+        * 商修正：
+        Z左移一位，最低位：为X和Y同号补1，异号补0
+        被除数和Y同号：无操作
+        被除数和Y异号：Z最低位加1
+        * */
         if(SRC.equals(remainderReg.toString())){
             remainderReg = new DataType("00000000000000000000000000000000");
             return new DataType(add(ans.toString(), "00000000000000000000000000000001"));
@@ -86,7 +107,7 @@ public class ALU {
             return new DataType(add(ans.toString(), "11111111111111111111111111111111"));
         }
         return ans;
-     }
+    }
 
     public String add(String src, String dest) {
         char[] SRC;
